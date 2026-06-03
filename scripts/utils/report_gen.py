@@ -10,11 +10,8 @@ BugBounty Toolkit — 漏洞报告生成器
 """
 
 import argparse
-import json
-import sys
 import time
 from pathlib import Path
-from typing import Optional
 
 BANNER = """
 ╔══════════════════════════════════════════════════════════════╗

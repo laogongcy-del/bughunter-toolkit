@@ -99,50 +99,61 @@ class SQLIDetector:
             sep = '?' if '?' not in self.url else '&'
             return f"{self.url}{sep}q={urllib.parse.quote(payload, safe='')}"
 
+    def _check_time_based(self, elapsed: float, payload: str) -> Optional[dict]:
+        """检测时间盲注"""
+        if elapsed > self.baseline_time + 0.8:
+            return {
+                'payload': payload[:50],
+                'type': 'time',
+                'evidence': f'时间延迟: {elapsed:.2f}s (基线: {self.baseline_time:.2f}s)',
+            }
+        return None
+
+    def _check_error_based(self, resp_text: str, payload: str) -> Optional[dict]:
+        """检测错误注入"""
+        error_signs = [
+            'sql', 'mysql', 'oracle', 'postgres',
+            'syntax error', 'unclosed quotation',
+            'odbc', 'driver', 'db2',
+            'SQLSTATE', 'MariaDB',
+        ]
+        body_lower = resp_text.lower()
+        for sign in error_signs:
+            if sign in body_lower:
+                return {
+                    'payload': payload[:50],
+                    'type': 'error',
+                    'evidence': f'发现SQL错误信息: "{sign}"',
+                }
+        return None
+
+    def _check_boolean_based(self, resp_text: str, payload: str) -> Optional[dict]:
+        """检测布尔盲注"""
+        if self.baseline_body and resp_text != self.baseline_body:
+            if len(resp_text) != len(self.baseline_body):
+                return {
+                    'payload': payload[:50],
+                    'type': 'boolean',
+                    'evidence': f'响应内容长度变化: {len(resp_text)} (基线: {len(self.baseline_body)})',
+                }
+        return None
+
     def test_payload(self, payload: str, payload_type: str) -> Optional[dict]:
         """测试单个payload"""
         test_url = self._build_url(payload)
 
         try:
             start = time.time()
-            resp = self.session.get(test_url, timeout=self.timeout + 5)  # 给时间盲注留余量
+            resp = self.session.get(test_url, timeout=self.timeout + 5)
             elapsed = time.time() - start
             time.sleep(self.delay)
 
-            result = {
-                'payload': payload[:50],
-                'type': payload_type,
-                'status': resp.status_code,
-                'length': len(resp.text),
-                'time': round(elapsed, 2),
-            }
-
-            # 时间盲注检测
             if payload_type == 'time':
-                if elapsed > self.baseline_time + 0.8:  # 响应时间明显增加
-                    result['evidence'] = f'时间延迟: {elapsed:.2f}s (基线: {self.baseline_time:.2f}s)'
-                    return result
-
-            # 错误/布尔注入检测
+                return self._check_time_based(elapsed, payload)
             elif payload_type == 'error':
-                error_signs = [
-                    'sql', 'mysql', 'oracle', 'postgres',
-                    'syntax error', 'unclosed quotation',
-                    'odbc', 'driver', 'db2',
-                    'SQLSTATE', 'MariaDB',
-                ]
-                body_lower = resp.text.lower()
-                for sign in error_signs:
-                    if sign in body_lower:
-                        result['evidence'] = f'发现SQL错误信息: "{sign}"'
-                        return result
-
-            # 布尔盲注
+                return self._check_error_based(resp.text, payload)
             elif payload_type == 'boolean':
-                if self.baseline_body and resp.text != self.baseline_body:
-                    if len(resp.text) != len(self.baseline_body):
-                        result['evidence'] = f'响应内容长度变化: {len(resp.text)} (基线: {len(self.baseline_body)})'
-                        return result
+                return self._check_boolean_based(resp.text, payload)
 
             return None
 
@@ -155,7 +166,7 @@ class SQLIDetector:
                     'evidence': '请求超时，可能触发了时间延迟',
                 }
             return None
-        except Exception as e:
+        except Exception:
             return None
 
     def run(self) -> list:
@@ -183,7 +194,7 @@ class SQLIDetector:
             return
 
         print(f"\n{'='*60}")
-        print(f"✅ SQL注入检测报告")
+        print("✅ SQL注入检测报告")
         print(f"{'='*60}")
         print(f"\n发现 {len(self.findings)} 个可疑注入点:")
         for i, f in enumerate(self.findings, 1):

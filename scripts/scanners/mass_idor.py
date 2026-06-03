@@ -11,7 +11,6 @@ BugBounty Toolkit — 批量IDOR/越权检测脚本
 """
 
 import argparse
-import json
 import re
 import sys
 import time
@@ -90,7 +89,7 @@ class IDORDetector:
             return None
         except requests.exceptions.ConnectionError:
             return None
-        except Exception as e:
+        except Exception:
             return None
 
         return None
@@ -150,7 +149,7 @@ class IDORDetector:
         print(f"\n[+] 开始检测 {total} 个URL...")
 
         # 阶段1: 未授权检测
-        print(f"\n[*] 阶段1: 未授权访问检测")
+        print("\n[*] 阶段1: 未授权访问检测")
         with ThreadPoolExecutor(max_workers=self.threads) as executor:
             futures = {executor.submit(self.check_unauthenticated_access, url): url
                        for url in self.urls}
@@ -163,7 +162,7 @@ class IDORDetector:
                     print(f"  [*] 进度: {i}/{total}")
 
         # 阶段2: ID参数篡改检测
-        print(f"\n[*] 阶段2: ID参数篡改检测")
+        print("\n[*] 阶段2: ID参数篡改检测")
         for i, url in enumerate(self.urls, 1):
             findings = self.check_id_param_manipulation(url)
             for f in findings:

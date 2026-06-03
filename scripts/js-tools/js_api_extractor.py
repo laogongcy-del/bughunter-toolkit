@@ -133,7 +133,6 @@ class JSApiExtractor:
 
     def process_js_url(self, js_url: str) -> dict:
         """处理单个JS URL"""
-        import time
         print(f"  [*] 分析: {js_url}")
 
         content = self.fetch_js(js_url)
@@ -240,7 +239,6 @@ class JSApiExtractor:
 
 
 def main():
-    import time
     print(BANNER)
     print("[!] 你是否已获得目标系统的书面测试授权？")
     resp = input("输入 yes 继续: ").strip().lower()
@@ -275,11 +273,11 @@ def main():
             sys.exit(1)
 
         content = path.read_text().strip()
-        lines = [l.strip() for l in content.splitlines() if l.strip() and not l.startswith('#')]
+        lines = [line.strip() for line in content.splitlines() if line.strip() and not line.startswith('#')]
 
         # 判断是URL还是本地文件路径
-        urls = [l for l in lines if l.startswith('http://') or l.startswith('https://')]
-        files = [l for l in lines if not l.startswith('http://') and not l.startswith('https://')]
+        urls = [line for line in lines if line.startswith('http://') or line.startswith('https://')]
+        files = [line for line in lines if not line.startswith('http://') and not line.startswith('https://')]
 
         result = {'total_sources': 0, 'api_endpoints': [], 'total_apis': 0, 'secrets': [], 'total_secrets': 0}
 

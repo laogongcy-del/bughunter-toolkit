@@ -13,14 +13,12 @@ BugBounty Toolkit — OOB/带外检测工具
 """
 
 import argparse
-import json
 import random
 import string
 import sys
 import time
 import urllib3
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from pathlib import Path
 from typing import Optional
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -101,8 +99,8 @@ class OOBServer:
         print(f"\n[+] OOB监听已启动: http://{self.host}:{self.port}")
         print(f"[+] 监听超时: {timeout}秒")
         print(f"[+] 测试URL示例: {self.generate_test_url()}")
-        print(f"\n[*] 在目标请求中使用以上URL进行OOB检测")
-        print(f"[*] 按 Ctrl+C 停止监听\n")
+        print("\n[*] 在目标请求中使用以上URL进行OOB检测")
+        print("[*] 按 Ctrl+C 停止监听\n")
 
         server.timeout = timeout
         try:

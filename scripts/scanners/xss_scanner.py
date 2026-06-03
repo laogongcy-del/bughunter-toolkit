@@ -15,7 +15,6 @@ import sys
 import time
 import urllib.parse
 import urllib3
-from pathlib import Path
 from typing import Optional
 
 import requests
@@ -116,7 +115,7 @@ class XSSTester:
 
     def run(self) -> list:
         """执行XSS检测"""
-        print(f"\n[*] 开始XSS反射检测")
+        print("\n[*] 开始XSS反射检测")
         print(f"[*] 目标: {self.base_url}")
         print(f"[*] 参数: {self.param or '自动'}")
         print(f"[*] 测试: {len(XSS_PAYLOADS)} 个payload\n")
@@ -137,7 +136,7 @@ class XSSTester:
             return
 
         print(f"\n{'='*60}")
-        print(f"✅ XSS反射检测报告")
+        print("✅ XSS反射检测报告")
         print(f"{'='*60}")
         print(f"\n发现 {len(self.findings)} 个反射点:")
         for f in self.findings:

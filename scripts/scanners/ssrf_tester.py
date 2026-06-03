@@ -191,8 +191,8 @@ def main():
 
     payloads = None
     if args.payloads:
-        payloads = [l.strip() for l in Path(args.payloads).read_text().splitlines()
-                    if l.strip() and not l.startswith('#')]
+        payloads = [line.strip() for line in Path(args.payloads).read_text().splitlines()
+                    if line.strip() and not line.startswith('#')]
 
     tester.run(payloads)
 

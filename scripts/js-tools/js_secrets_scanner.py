@@ -18,8 +18,8 @@ import sys
 import time
 import urllib3
 from pathlib import Path
-from typing import List, Set, Optional
-from urllib.parse import urljoin, urlparse
+from typing import List
+from urllib.parse import urljoin
 
 import requests
 

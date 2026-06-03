@@ -13,7 +13,7 @@ import argparse
 import sys
 import time
 import urllib3
-from typing import List, Optional
+from typing import Optional
 
 import requests
 

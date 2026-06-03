@@ -10,7 +10,6 @@ BugBounty Toolkit — CORS配置检测脚本
 """
 
 import argparse
-import sys
 import urllib3
 from typing import Optional
 
@@ -125,7 +124,7 @@ class CORSTester:
             return
 
         print(f"\n{'='*60}")
-        print(f"CORS检测报告")
+        print("CORS检测报告")
         print(f"{'='*60}")
         for f in self.findings:
             print(f"\n[发现] Origin: {f['origin']}")

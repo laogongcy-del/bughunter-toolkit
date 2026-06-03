@@ -84,7 +84,7 @@ class JSDiffer:
         }
         snapshot_file.write_text(json.dumps(snapshot, indent=2))
 
-        print(f"  [+] 快照已保存")
+        print("  [+] 快照已保存")
         print(f"  [+] 大小: {len(content)} bytes")
         print(f"  [+] Hash: {snapshot['hash'][:16]}")
         return True
@@ -118,7 +118,7 @@ class JSDiffer:
         }
 
         if result['changed']:
-            print(f"  [!!] JS文件已变化!")
+            print("  [!!] JS文件已变化!")
             print(f"      旧: {old_snapshot['size']} bytes ({old_snapshot['time']})")
             print(f"      新: {len(new_content)} bytes (当前)")
 
@@ -130,8 +130,8 @@ class JSDiffer:
             old_set = set(old_lines)
             new_set = set(new_lines)
 
-            added = [l for l in new_lines if l.strip() and l not in old_set]
-            removed = [l for l in old_lines if l.strip() and l not in new_set]
+            added = [ln for ln in new_lines if ln.strip() and ln not in old_set]
+            removed = [ln for ln in old_lines if ln.strip() and ln not in new_set]
 
             # 查找新增API端点
             import re
@@ -141,7 +141,7 @@ class JSDiffer:
                 added_apis.extend(apis)
 
             if added_apis:
-                print(f"\n  [+] 新增API端点:")
+                print("\n  [+] 新增API端点:")
                 for api in added_apis[:20]:
                     print(f"      {api}")
 
@@ -159,13 +159,13 @@ class JSDiffer:
             result['added_apis'] = added_apis[:20]
 
             # 询问是否更新快照
-            print(f"\n  [?] 是否更新快照？(y/n): ", end='')
+            print("\n  [?] 是否更新快照？(y/n): ", end='')
             # 非交互模式自动更新
             import sys as _sys
             if '--auto-update' in _sys.argv:
                 self._update_snapshot(file_id, url, new_content, new_hash)
         else:
-            print(f"  [*] JS文件无变化")
+            print("  [*] JS文件无变化")
 
         return result
 
@@ -181,7 +181,7 @@ class JSDiffer:
         (self.base_dir / f"{file_id}.content").write_text(content, encoding='utf-8')
         if Path(f"{self.base_dir / file_id}.content.new").exists():
             Path(f"{self.base_dir / file_id}.content.new").unlink()
-        print(f"  [+] 快照已更新")
+        print("  [+] 快照已更新")
 
 
 def main():
