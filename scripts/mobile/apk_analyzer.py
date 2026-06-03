@@ -79,7 +79,6 @@ def confirm_consent() -> bool:
 # ---------------------------------------------------------------------------
 # 日志
 # ---------------------------------------------------------------------------
-import logging
 logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s] %(levelname)s - %(message)s",
