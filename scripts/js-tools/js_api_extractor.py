@@ -15,6 +15,7 @@ import argparse
 import json
 import re
 import sys
+import time
 import urllib3
 from pathlib import Path
 from typing import List, Set, Optional
