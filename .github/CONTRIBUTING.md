@@ -197,8 +197,8 @@ validate_url() {
 
 ```bash
 # 克隆仓库
-git clone https://github.com/your-username/BugBounty-Toolkit.git
-cd BugBounty-Toolkit
+git clone https://github.com/laogongcy-del/bughunter-toolkit.git
+cd bughunter-toolkit
 
 # 安装依赖
 python -m venv .venv
