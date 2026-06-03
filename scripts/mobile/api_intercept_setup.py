@@ -27,16 +27,14 @@
 
 import argparse
 import json
+import logging
 import os
 import platform
-import re
 import socket
 import subprocess
 import sys
-import time
 from datetime import datetime
-from typing import Optional, List, Dict, Tuple
-from pathlib import Path
+from typing import Optional, List, Dict
 
 # ---------------------------------------------------------------------------
 # 授权确认
@@ -74,7 +72,6 @@ def confirm_consent() -> bool:
 # ---------------------------------------------------------------------------
 # 日志
 # ---------------------------------------------------------------------------
-import logging
 logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s] %(levelname)s - %(message)s",
@@ -343,7 +340,8 @@ def generate_android_config(ip: str, port: int = 8080) -> str:
       // OkHttp3
       try {{
           var CertificatePinner = Java.use('okhttp3.CertificatePinner');
-          CertificatePinner.check.overload('java.lang.String', 'java.util.List').implementation = function(hostname, peerCertificates) {{
+          CertificatePinner.check.overload(\
+    'java.lang.String', 'java.util.List').implementation = function(hostname, peerCertificates) {{
               console.log('[Bypass] Skipping certificate pin for: ' + hostname);
               return;
           }};
@@ -733,7 +731,7 @@ def analyze_traffic_file(file_path: str, output_path: Optional[str] = None) -> O
     print(f"  唯一路径: {unique_paths}")
     print(f"  报告文件: {output_path}")
 
-    print(f"\n  域名列表:")
+    print("\n  域名列表:")
     for host, data in sorted(endpoints.items(), key=lambda x: -x[1]["total_requests"])[:10]:
         print(f"    {host:40s} {data['total_requests']:4d} 请求  {data['methods']}")
 
@@ -743,7 +741,45 @@ def analyze_traffic_file(file_path: str, output_path: Optional[str] = None) -> O
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
-def main():
+def _handle_gen_config(args):
+    """处理 gen-config 子命令"""
+    ip = args.ip
+    port = args.port
+    out_dir = args.output
+    os.makedirs(out_dir, exist_ok=True)
+
+    configs = []
+    if args.only in ("all", "burp"):  # noqa
+        configs.append(("burp_config.txt", generate_burp_config(ip, port)))
+    if args.only in ("all", "mitm"):
+        configs.append(("mitmproxy_config.txt", generate_mitmproxy_config(ip, port)))
+    if args.only in ("all", "android"):
+        configs.append(("android_config.txt", generate_android_config(ip, port)))
+    if args.only in ("all", "ios"):
+        configs.append(("ios_config.txt", generate_ios_config(ip, port)))
+
+    for fname, content in configs:
+        fpath = os.path.join(out_dir, fname)
+        with open(fpath, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(f"[+] 配置已生成: {fpath}")
+
+    print(f"\n[+] 所有配置已写入: {os.path.abspath(out_dir)}")
+
+
+def _handle_detect():
+    """处理 detect 子命令"""
+    info = detect_platform()
+    print("\n当前环境检测:")
+    print(f"  操作系统:     {info['os']}")
+    print(f"  ADB:         {'[OK]' if info['has_adb'] else '[--]'}  (adb)")
+    print(f"  mitmproxy:   {'[OK]' if info['has_mitmproxy'] else '[--]'}  (mitmproxy)")
+    print(f"  Java:        {'[OK]' if info['has_burp'] else '[--]'}  (用于 Burp Suite)")
+    print(f"\n本机IP: {get_local_ip()}")
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    """构建命令行参数解析器"""
     parser = argparse.ArgumentParser(
         description="移动API抓取配置助手 - API Interception Setup (仅限授权测试)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -798,6 +834,11 @@ def main():
     # detect
     subparsers.add_parser("detect", help="检测当前环境工具链")
 
+    return parser
+
+
+def main():
+    parser = _build_parser()
     args = parser.parse_args()
 
     if args.command is None:
@@ -808,51 +849,17 @@ def main():
     if not confirm_consent():
         sys.exit(1)
 
-    # gen-config
     if args.command == "gen-config":
-        ip = args.ip
-        port = args.port
-        out_dir = args.output
-        os.makedirs(out_dir, exist_ok=True)
-
-        configs = []
-        if args.only in ("all", "burp"):
-            configs.append(("burp_config.txt", generate_burp_config(ip, port)))
-        if args.only in ("all", "mitm"):
-            configs.append(("mitmproxy_config.txt", generate_mitmproxy_config(ip, port)))
-        if args.only in ("all", "android"):
-            configs.append(("android_config.txt", generate_android_config(ip, port)))
-        if args.only in ("all", "ios"):
-            configs.append(("ios_config.txt", generate_ios_config(ip, port)))
-
-        for fname, content in configs:
-            fpath = os.path.join(out_dir, fname)
-            with open(fpath, "w", encoding="utf-8") as f:
-                f.write(content)
-            print(f"[+] 配置已生成: {fpath}")
-
-        print(f"\n[+] 所有配置已写入: {os.path.abspath(out_dir)}")
-
-    # gen-script
+        _handle_gen_config(args)
     elif args.command == "gen-script":
         generate_setup_script(args.ip, args.port, args.output)
-
-    # analyze
     elif args.command == "analyze":
         if not os.path.isfile(args.file):
             print(f"[-] 文件不存在: {args.file}")
             sys.exit(1)
         analyze_traffic_file(args.file, args.output)
-
-    # detect
     elif args.command == "detect":
-        info = detect_platform()
-        print(f"\n当前环境检测:")
-        print(f"  操作系统:     {info['os']}")
-        print(f"  ADB:         {'[OK]' if info['has_adb'] else '[--]'}  (adb)")
-        print(f"  mitmproxy:   {'[OK]' if info['has_mitmproxy'] else '[--]'}  (mitmproxy)")
-        print(f"  Java:        {'[OK]' if info['has_burp'] else '[--]'}  (用于 Burp Suite)")
-        print(f"\n本机IP: {get_local_ip()}")
+        _handle_detect()
 
 
 if __name__ == "__main__":

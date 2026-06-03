@@ -23,12 +23,13 @@
 
 import argparse
 import json
+import logging
 import os
 import re
 import sys
 import time
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from typing import Optional, Dict, List, Callable, Any
 from enum import Enum
 
@@ -87,7 +88,6 @@ class RateLimiter:
 # ---------------------------------------------------------------------------
 # 日志
 # ---------------------------------------------------------------------------
-import logging
 logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s] %(levelname)s - %(message)s",
@@ -195,7 +195,6 @@ try:
     from scripts.auth.captcha_utils import (
         download_captcha,
         manual_captcha_input,
-        ocr_captcha,
     )
     HAS_CAPTCHA_UTILS = True
 except ImportError:
@@ -343,7 +342,7 @@ class BlackLakeCNTemplate(TargetTemplate):
         """
         sms_full_url = self.base_url + self.sms_url
 
-        logger.info(f"[blacklake] 正在提交短信验证码...")
+        logger.info("[blacklake] 正在提交短信验证码...")
 
         # 短信验证码需要用户手动从手机获取
         # 这里提示用户输入

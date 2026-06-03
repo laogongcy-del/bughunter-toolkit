@@ -207,13 +207,23 @@ SECRET_PATTERNS: List[Tuple[str, re.Pattern, str]] = [
     ("Firebase API Key", re.compile(r'AIzaSy[0-9A-Za-z_-]{33}'), "高"),
     ("Google OAuth", re.compile(r'[0-9]+-[0-9A-Za-z_]{32}\.apps\.googleusercontent\.com'), "中"),
     ("阿里云 AccessKey", re.compile(r'LTAI[0-9A-Za-z]{12,20}'), "高"),
-    ("通用 API Key", re.compile(r'(?i)(?:api[_-]?key|apikey|secret[_-]?key)["\s:=]+["\'][a-zA-Z0-9_\-]{16,64}["\']'), "高"),
+    ("通用 API Key", re.compile(
+        r'(?i)(?:api[_-]?key|apikey|secret[_-]?key)'
+        r'["\s:=]+["\'][a-zA-Z0-9_\-]{16,64}["\']'
+    ), "高"),
     ("JWT Token", re.compile(r'eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}'), "高"),
     ("Authorization Header", re.compile(r'(?i)authorization:\s*(?:bearer|basic|token)\s+[a-zA-Z0-9_\-./=+]{8,}'), "高"),
     ("Password Hardcode", re.compile(r'(?i)(?:password|pwd|passwd)["\s:=]+["\'][^"\'"]{6,}["\']'), "中"),
-    ("Token Hardcode", re.compile(r'(?i)(?:token|access_token|refresh_token)["\s:=]+["\'][a-zA-Z0-9_\-]{16,}["\']'), "高"),
+    ("Token Hardcode", re.compile(
+        r'(?i)(?:token|access_token|refresh_token)'
+        r'["\s:=]+["\'][a-zA-Z0-9_\-]{16,}["\']'
+    ), "高"),
     ("OSS Endpoint", re.compile(r'(?:oss|cos|s3)[.\-][a-zA-Z0-9.\-]+(?:\.com|\.cn)'), "中"),
-    ("Private IP", re.compile(r'\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})\b'), "中"),
+    ("Private IP", re.compile(
+        r'\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}'
+        r'|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}'
+        r'|192\.168\.\d{1,3}\.\d{1,3})\b'
+    ), "中"),
     ("MongoDB URI", re.compile(r'mongodb(?:\+srv)?://[^\s"\'<>]+'), "高"),
     ("MySQL URI", re.compile(r'mysql://[^\s"\'<>]+'), "高"),
     ("Redis URI", re.compile(r'redis://[^\s"\'<>]+'), "高"),
@@ -444,7 +454,7 @@ def generate_report(
     print(f"  报告文件:        {output_path}")
 
     if high_secrets:
-        print(f"\n  [!] 高严重性发现:")
+        print("\n  [!] 高严重性发现:")
         for s in high_secrets[:10]:
             print(f"      - [{s['type']}] {s['value'][:80]}")
             print(f"        文件: {s['file']}")
@@ -557,7 +567,51 @@ def analyze_apk(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
-def main():
+def _handle_download(args, output_dir: str) -> list:
+    """处理 --download 参数，返回下载的APK路径列表"""
+    apk_paths = []
+    if args.download:
+        if not args.no_download_confirm:
+            try:
+                ok = input(f"[?] 即将下载: {args.download}\n    继续? (yes/no): ").strip().lower() in ("yes", "y")
+                if not ok:
+                    print("[-] 取消下载")
+                    sys.exit(1)
+            except (KeyboardInterrupt, EOFError):
+                print()
+                sys.exit(1)
+
+        dl_path = os.path.join(output_dir, "downloaded.apk")
+        downloaded = download_apk(args.download, dl_path, RateLimiter(args.rate_limit))
+        apk_paths.append(downloaded)
+    return apk_paths
+
+
+def _handle_url_list(args, output_dir: str) -> list:
+    """处理 --url-list 参数，返回下载的APK路径列表"""
+    apk_paths = []
+    if args.url_list:
+        if not os.path.isfile(args.url_list):
+            print(f"[-] URL列表文件不存在: {args.url_list}")
+            sys.exit(1)
+
+        rate_limiter = RateLimiter(args.rate_limit)
+        with open(args.url_list, "r") as f:
+            urls = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+
+        for i, url in enumerate(urls):
+            fname = f"apk_{i}_{int(time.time())}.apk"
+            dl_path = os.path.join(output_dir, fname)
+            try:
+                downloaded = download_apk(url, dl_path, rate_limiter)
+                apk_paths.append(downloaded)
+            except Exception as e:
+                logger.error(f"下载失败 {url}: {e}")
+    return apk_paths
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    """构建命令行参数解析器"""
     parser = argparse.ArgumentParser(
         description="APK分析工具 - Android APK Static Analyzer (仅限授权测试)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -589,6 +643,11 @@ def main():
     parser.add_argument("--rate-limit", type=float, default=2.0, help="下载请求间隔(秒)")
     parser.add_argument("--no-download-confirm", action="store_true", help="下载前不确认")
 
+    return parser
+
+
+def main():
+    parser = _build_parser()
     args = parser.parse_args()
 
     if not any([args.apk, args.download, args.url_list]):
@@ -604,41 +663,8 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     apk_paths = []
-
-    # 处理 --download
-    if args.download:
-        if not args.no_download_confirm:
-            try:
-                ok = input(f"[?] 即将下载: {args.download}\n    继续? (yes/no): ").strip().lower() in ("yes", "y")
-                if not ok:
-                    print("[-] 取消下载")
-                    sys.exit(1)
-            except (KeyboardInterrupt, EOFError):
-                print()
-                sys.exit(1)
-
-        dl_path = os.path.join(output_dir, "downloaded.apk")
-        downloaded = download_apk(args.download, dl_path, RateLimiter(args.rate_limit))
-        apk_paths.append(downloaded)
-
-    # 处理 --url-list
-    if args.url_list:
-        if not os.path.isfile(args.url_list):
-            print(f"[-] URL列表文件不存在: {args.url_list}")
-            sys.exit(1)
-
-        rate_limiter = RateLimiter(args.rate_limit)
-        with open(args.url_list, "r") as f:
-            urls = [line.strip() for line in f if line.strip() and not line.startswith("#")]
-
-        for i, url in enumerate(urls):
-            fname = f"apk_{i}_{int(time.time())}.apk"
-            dl_path = os.path.join(output_dir, fname)
-            try:
-                downloaded = download_apk(url, dl_path, rate_limiter)
-                apk_paths.append(downloaded)
-            except Exception as e:
-                logger.error(f"下载失败 {url}: {e}")
+    apk_paths.extend(_handle_download(args, output_dir))
+    apk_paths.extend(_handle_url_list(args, output_dir))
 
     # 处理 --apk
     if args.apk:

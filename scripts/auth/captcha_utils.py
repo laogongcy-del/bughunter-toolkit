@@ -19,12 +19,12 @@
 """
 
 import argparse
-import hashlib
+import json
 import os
 import sys
 import time
 import logging
-from typing import Optional, List, Tuple
+from typing import Optional, List
 
 # ---------------------------------------------------------------------------
 # 第三方导入（带优雅降级）
@@ -258,7 +258,13 @@ def ocr_captcha(image_path: str, config: Optional[str] = None) -> Optional[str]:
         img = img.point(lambda p: 255 if p > threshold else 0)
 
         # tesseract 配置: 仅识别数字和字母，PSM 8 = 单字符模式
-        custom_config = config or "--psm 8 --oem 3 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+        custom_config = config or (
+            "--psm 8 --oem 3 "
+            "-c tessedit_char_whitelist="
+            "0123456789"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "abcdefghijklmnopqrstuvwxyz"
+        )
 
         result = pytesseract.image_to_string(img, config=custom_config).strip()
 
@@ -277,50 +283,26 @@ def ocr_captcha(image_path: str, config: Optional[str] = None) -> Optional[str]:
 # ---------------------------------------------------------------------------
 # 手动输入模式
 # ---------------------------------------------------------------------------
-def manual_captcha_input(image_path: str, desktop: bool = False) -> Optional[str]:
-    """
-    手动模式: 下载验证码并提示用户输入
-
-    Args:
-        image_path: 验证码图片路径
-        desktop: 是否尝试将图片复制到桌面
-
-    Returns:
-        用户输入的验证码，取消返回 None
-    """
-    if not os.path.exists(image_path):
-        logger.error(f"图片不存在: {image_path}")
+def _gui_captcha_input(image_path: str) -> Optional[str]:
+    """弹出图形化输入框获取验证码"""
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        result = simpledialog.askstring(
+            "验证码输入",
+            f"请查看验证码图片:\n{os.path.abspath(image_path)}\n\n输入验证码:"
+        )
+        root.destroy()
+        if result:
+            logger.info(f"用户输入验证码: '{result}'")
+            return result.strip()
+        return None
+    except Exception:
         return None
 
-    logger.info(f"验证码图片位置: {os.path.abspath(image_path)}")
 
-    # 如果可用，尝试用 PIL 显示图片
-    if PIL_AVAILABLE:
-        try:
-            img = Image.open(image_path)
-            logger.info(f"图片尺寸: {img.size}, 模式: {img.mode}")
-        except Exception as e:
-            logger.warning(f"无法打开图片预览: {e}")
-
-    # 尝试弹出 GUI 输入框
-    if TKINTER_AVAILABLE:
-        try:
-            root = tk.Tk()
-            root.withdraw()  # 隐藏主窗口
-            result = simpledialog.askstring(
-                "验证码输入",
-                f"请查看验证码图片:\n{os.path.abspath(image_path)}\n\n输入验证码:"
-            )
-            root.destroy()
-            if result:
-                logger.info(f"用户输入验证码: '{result}'")
-                return result.strip()
-            return None
-        except Exception:
-            pass
-
-    # 退化为命令行输入
-    print(f"\n[!] 请查看验证码文件: {os.path.abspath(image_path)}")
+def _cli_captcha_input() -> Optional[str]:
+    """命令行输入验证码"""
     try:
         result = input("请输入验证码 (直接回车取消): ").strip()
         if result:
@@ -330,6 +312,44 @@ def manual_captcha_input(image_path: str, desktop: bool = False) -> Optional[str
     except (KeyboardInterrupt, EOFError):
         print()
         return None
+
+
+def _preview_image(image_path: str) -> None:
+    """如果可用，用 PIL 显示图片信息"""
+    if PIL_AVAILABLE:
+        try:
+            img = Image.open(image_path)
+            logger.info(f"图片尺寸: {img.size}, 模式: {img.mode}")
+        except Exception as e:
+            logger.warning(f"无法打开图片预览: {e}")
+
+
+def manual_captcha_input(image_path: str) -> Optional[str]:
+    """
+    手动模式: 下载验证码并提示用户输入
+
+    Args:
+        image_path: 验证码图片路径
+
+    Returns:
+        用户输入的验证码，取消返回 None
+    """
+    if not os.path.exists(image_path):
+        logger.error(f"图片不存在: {image_path}")
+        return None
+
+    logger.info(f"验证码图片位置: {os.path.abspath(image_path)}")
+    _preview_image(image_path)
+
+    # 尝试弹出 GUI 输入框
+    if TKINTER_AVAILABLE:
+        result = _gui_captcha_input(image_path)
+        if result is not None:
+            return result
+
+    # 退化为命令行输入
+    print(f"\n[!] 请查看验证码文件: {os.path.abspath(image_path)}")
+    return _cli_captcha_input()
 
 
 # ---------------------------------------------------------------------------
@@ -371,6 +391,131 @@ def get_bypass_payloads() -> List[dict]:
     ]
 
 
+def _get_baseline(
+    s: "requests.Session",
+    url: str,
+    form_data_template: dict,
+    captcha_field: str,
+    rate_limiter: RateLimiter,
+) -> tuple:
+    """获取正常请求的基线响应状态码和长度"""
+    logger.info("正在获取基线响应（正常请求）...")
+    rate_limiter.wait()
+    baseline_data = form_data_template.copy()
+    baseline_data[captcha_field] = "DUMMY_BASELINE"
+    try:
+        baseline_resp = s.post(url, data=baseline_data, timeout=15)
+        baseline_length = len(baseline_resp.text)
+        baseline_status = baseline_resp.status_code
+        logger.info(f"基线响应: 状态码={baseline_status}, 响应体长度={baseline_length}")
+        return baseline_status, baseline_length
+    except requests.exceptions.RequestException as e:
+        logger.error(f"无法获取基线响应: {e}")
+        return 0, -1
+
+
+def _build_payload_data(
+    form_data_template: dict,
+    captcha_field: str,
+    payload: dict,
+    reuse_captcha_value: Optional[str] = None,
+) -> Optional[dict]:
+    """根据 payload 构建测试用表单数据，返回 None 表示跳过"""
+    test_data = form_data_template.copy()
+    field_value = payload["field_value"]
+
+    if field_value == "__REMOVED__":
+        return test_data  # 不加 captcha_field
+    elif field_value == "__RENAME__":
+        test_data[captcha_field + "_bypass"] = "ignored"
+        test_data[captcha_field] = ""
+    elif field_value == "__REUSE__":
+        if reuse_captcha_value:
+            test_data[captcha_field] = reuse_captcha_value
+        else:
+            logger.warning("未提供旧的验证码值，跳过重放测试")
+            return None
+    else:
+        test_data[captcha_field] = field_value
+    return test_data
+
+
+def _check_bypass_response(
+    resp: "requests.Response",
+    baseline_status: int,
+    baseline_length: int,
+    payload: dict,
+) -> dict:
+    """检查单个响应是否可能被绕过，返回结果字典"""
+    resp_len = len(resp.text)
+    status_diff = resp.status_code != baseline_status
+    length_diff_ratio = abs(resp_len - baseline_length) / max(baseline_length, 1)
+
+    maybe_bypass = False
+    if status_diff and resp.status_code in (200, 201, 302, 301):
+        maybe_bypass = True
+    if length_diff_ratio > 0.3:
+        maybe_bypass = True
+    success_keywords = ["成功", "success", "验证通过", "注册成功", "redirect"]
+    if any(kw in resp.text.lower() for kw in success_keywords):
+        maybe_bypass = True
+
+    return {
+        "name": payload["name"],
+        "field_value": payload["field_value"],
+        "status_code": resp.status_code,
+        "response_length": resp_len,
+        "description": payload["description"],
+        "maybe_vulnerable": maybe_bypass,
+    }
+
+
+def _log_bypass_summary(results: List[dict]):
+    """打印绕过测试汇总日志"""
+    vulnerable_found = [r for r in results if r.get("maybe_vulnerable")]
+    if vulnerable_found:
+        logger.warning(
+            f"\n[!] 发现 {len(vulnerable_found)} 个可能的绕过方式:"
+        )
+        for v in vulnerable_found:
+            logger.warning(f"    - {v['name']} (状态码: {v['status_code']})")
+    else:
+        logger.info("\n[-] 未发现明显的验证码绕过（仅供参考，不保证安全性）")
+
+
+def _test_single_payload(
+    s: "requests.Session",
+    url: str,
+    payload: dict,
+    test_data: dict,
+    baseline_status: int,
+    baseline_length: int,
+) -> dict:
+    """测试单个payload，返回结果字典"""
+    try:
+        resp = s.post(url, data=test_data, timeout=15)
+        result = _check_bypass_response(resp, baseline_status, baseline_length, payload)
+
+        status_icon = "[!]" if result["maybe_vulnerable"] else "[.]"
+        logger.info(
+            f"{status_icon} payload='{payload['name']}' "
+            f"-> status={resp.status_code}, len={result['response_length']}"
+            f"{' ** 可能绕过! **' if result['maybe_vulnerable'] else ''}"
+        )
+        return result
+    except requests.exceptions.RequestException as e:
+        logger.error(f"payload='{payload['name']}' 请求失败: {e}")
+        return {
+            "name": payload["name"],
+            "field_value": payload["field_value"],
+            "status_code": 0,
+            "response_length": 0,
+            "description": payload["description"],
+            "maybe_vulnerable": False,
+            "error": str(e),
+        }
+
+
 def test_captcha_bypass(
     url: str,
     form_data_template: dict,
@@ -405,111 +550,27 @@ def test_captcha_bypass(
     payloads = get_bypass_payloads()
     results = []
 
-    # 先获取一个正常响应作为基线
-    logger.info("正在获取基线响应（正常请求）...")
-    rate_limiter.wait()
-    baseline_data = form_data_template.copy()
-    baseline_data[captcha_field] = "DUMMY_BASELINE"
-    try:
-        baseline_resp = s.post(url, data=baseline_data, timeout=15)
-        baseline_length = len(baseline_resp.text)
-        baseline_status = baseline_resp.status_code
-        logger.info(f"基线响应: 状态码={baseline_status}, 响应体长度={baseline_length}")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"无法获取基线响应: {e}")
-        baseline_length = -1
-        baseline_status = 0
+    baseline_status, baseline_length = _get_baseline(
+        s, url, form_data_template, captcha_field, rate_limiter
+    )
 
     logger.info(f"开始验证码绕过测试（共 {len(payloads)} 个payload）...")
 
     for payload in payloads:
         rate_limiter.wait()
 
-        test_data = form_data_template.copy()
-        field_value = payload["field_value"]
-
-        # 处理特殊标记
-        if field_value == "__REMOVED__":
-            # 直接从请求中移除captcha字段
-            pass  # 已跳过添加
-        elif field_value == "__RENAME__":
-            test_data[captcha_field + "_bypass"] = "ignored"
-            # 原字段保留为空
-            test_data[captcha_field] = ""
-        elif field_value == "__REUSE__":
-            if reuse_captcha_value:
-                test_data[captcha_field] = reuse_captcha_value
-            else:
-                logger.warning("未提供旧的验证码值，跳过重放测试")
-                continue
-        else:
-            test_data[captcha_field] = field_value
-
-        # 对于 __REMOVED__，我们直接不添加 captcha_field
-        if field_value == "__REMOVED__":
-            test_data.pop(captcha_field, None)
-
-        try:
-            resp = s.post(url, data=test_data, timeout=15)
-            resp_len = len(resp.text)
-
-            # 判断是否有绕过迹象:
-            # 1. 状态码与基线不同（可能是成功状态码）
-            # 2. 响应体长度显著不同（可能进入了不同处理流程）
-            # 3. 响应中包含成功关键字
-            status_diff = resp.status_code != baseline_status
-            length_diff_ratio = abs(resp_len - baseline_length) / max(baseline_length, 1)
-
-            maybe_bypass = False
-            if status_diff and resp.status_code in (200, 201, 302, 301):
-                maybe_bypass = True
-            if length_diff_ratio > 0.3:
-                maybe_bypass = True
-            # 检查成功关键字
-            success_keywords = ["成功", "success", "验证通过", "注册成功", "redirect"]
-            if any(kw in resp.text.lower() for kw in success_keywords):
-                maybe_bypass = True
-
-            result = {
-                "name": payload["name"],
-                "field_value": payload["field_value"],
-                "status_code": resp.status_code,
-                "response_length": resp_len,
-                "description": payload["description"],
-                "maybe_vulnerable": maybe_bypass,
-            }
-            results.append(result)
-
-            status_icon = "[!]" if maybe_bypass else "[.]"
-            logger.info(
-                f"{status_icon} payload='{payload['name']}' "
-                f"-> status={resp.status_code}, len={resp_len}"
-                f"{' ** 可能绕过! **' if maybe_bypass else ''}"
-            )
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"payload='{payload['name']}' 请求失败: {e}")
-            results.append({
-                "name": payload["name"],
-                "field_value": payload["field_value"],
-                "status_code": 0,
-                "response_length": 0,
-                "description": payload["description"],
-                "maybe_vulnerable": False,
-                "error": str(e),
-            })
-
-    # 汇总结果
-    vulnerable_found = [r for r in results if r.get("maybe_vulnerable")]
-    if vulnerable_found:
-        logger.warning(
-            f"\n[!] 发现 {len(vulnerable_found)} 个可能的绕过方式:"
+        test_data = _build_payload_data(
+            form_data_template, captcha_field, payload, reuse_captcha_value
         )
-        for v in vulnerable_found:
-            logger.warning(f"    - {v['name']} (状态码: {v['status_code']})")
-    else:
-        logger.info("\n[-] 未发现明显的验证码绕过（仅供参考，不保证安全性）")
+        if test_data is None:
+            continue
 
+        result = _test_single_payload(
+            s, url, payload, test_data, baseline_status, baseline_length
+        )
+        results.append(result)
+
+    _log_bypass_summary(results)
     return results
 
 
@@ -558,7 +619,77 @@ def handle_captcha(
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
-def main():
+def _show_payloads():
+    """打印所有可用的绕过payload"""
+    print("\n可用的验证码绕过payloads:")
+    for i, p in enumerate(get_bypass_payloads(), 1):
+        print(f"  {i:2d}. {p['name']:16s} -> {p['field_value']!r:20s} ({p['description']})")
+
+
+def _handle_download(args):
+    """处理 download 子命令"""
+    download_captcha(args.url, args.output, rate_limiter=RateLimiter(args.rate_limit))
+    print(f"[+] 验证码已下载到: {os.path.abspath(args.output)}")
+
+
+def _handle_ocr(args):
+    """处理 ocr 子命令"""
+    result = ocr_captcha(args.image, args.config)
+    if result:
+        print(f"[+] OCR 识别结果: {result}")
+    else:
+        print("[-] OCR 识别失败")
+
+
+def _handle_manual(args):
+    """处理 manual 子命令"""
+    result = manual_captcha_input(args.image)
+    if result:
+        print(f"[+] 用户输入验证码: {result}")
+    else:
+        print("[-] 用户取消输入")
+
+
+def _handle_auto(args):
+    """处理 auto 子命令"""
+    result = handle_captcha(
+        args.url, args.output, mode=args.mode,
+        rate_limiter=RateLimiter(args.rate_limit),
+    )
+    if result:
+        print(f"[+] 验证码: {result}")
+    else:
+        print("[-] 未能获取验证码")
+
+
+def _handle_bypass(args):
+    """处理 bypass 子命令"""
+    try:
+        form_data = json.loads(args.form)
+    except json.JSONDecodeError as e:
+        print(f"[-] 表单数据JSON解析失败: {e}")
+        sys.exit(1)
+
+    results = test_captcha_bypass(
+        args.url, form_data, args.field,
+        rate_limiter=RateLimiter(args.rate_limit),
+        reuse_captcha_value=args.reuse,
+    )
+
+    vulnerable = [r for r in results if r.get("maybe_vulnerable")]
+    if vulnerable:
+        print(f"\n[!] 发现 {len(vulnerable)} 个可能的绕过方式:")
+        print(f"{'名称':20s} {'状态码':8s} {'响应长度':12s}")
+        print("-" * 45)
+        for v in vulnerable:
+            print(f"{v['name']:20s} {v['status_code']:<8d} {v['response_length']:<12d}")
+    else:
+        print("\n[-] 未发现明显的验证码绕过")
+        print("    注意: 这不能保证验证码实现是安全的。")
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    """构建命令行参数解析器"""
     parser = argparse.ArgumentParser(
         description="验证码工具集 - Captcha Utilities (仅限授权测试)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -576,7 +707,7 @@ def main():
   # 一站式处理（先OCR，失败则手动）
   %(prog)s auto --url https://example.com/captcha.jpg --mode both
 
-  # 绕过测试
+  skip
   %(prog)s bypass --url https://example.com/register --form '{"username":"test","password":"test123"}' --field captcha
 
         """,
@@ -621,75 +752,34 @@ def main():
     bypass_parser.add_argument("--rate-limit", type=float, default=2.0, help="请求间隔(秒)")
     bypass_parser.add_argument("--list-payloads", action="store_true", help="列出所有绕过payload")
 
+    return parser
+
+
+def main():
+    parser = _build_parser()
     args = parser.parse_args()
 
     if args.command is None:
         parser.print_help()
         return
 
-    # 授权确认
     if not confirm_authorization():
         sys.exit(1)
 
-    # bypass 子命令的 --list-payloads 可以跳过运行测试
     if hasattr(args, "list_payloads") and args.list_payloads:
-        print("\n可用的验证码绕过payloads:")
-        for i, p in enumerate(get_bypass_payloads(), 1):
-            print(f"  {i:2d}. {p['name']:16s} -> {p['field_value']!r:20s} ({p['description']})")
+        _show_payloads()
         return
 
-    if args.command == "download":
-        download_captcha(args.url, args.output, rate_limiter=RateLimiter(args.rate_limit))
-        print(f"[+] 验证码已下载到: {os.path.abspath(args.output)}")
-
-    elif args.command == "ocr":
-        result = ocr_captcha(args.image, args.config)
-        if result:
-            print(f"[+] OCR 识别结果: {result}")
-        else:
-            print("[-] OCR 识别失败")
-
-    elif args.command == "manual":
-        result = manual_captcha_input(args.image)
-        if result:
-            print(f"[+] 用户输入验证码: {result}")
-        else:
-            print("[-] 用户取消输入")
-
-    elif args.command == "auto":
-        result = handle_captcha(
-            args.url, args.output, mode=args.mode,
-            rate_limiter=RateLimiter(args.rate_limit),
-        )
-        if result:
-            print(f"[+] 验证码: {result}")
-        else:
-            print("[-] 未能获取验证码")
-
-    elif args.command == "bypass":
-        import json
-        try:
-            form_data = json.loads(args.form)
-        except json.JSONDecodeError as e:
-            print(f"[-] 表单数据JSON解析失败: {e}")
-            sys.exit(1)
-
-        results = test_captcha_bypass(
-            args.url, form_data, args.field,
-            rate_limiter=RateLimiter(args.rate_limit),
-            reuse_captcha_value=args.reuse,
-        )
-
-        vulnerable = [r for r in results if r.get("maybe_vulnerable")]
-        if vulnerable:
-            print(f"\n[!] 发现 {len(vulnerable)} 个可能的绕过方式:")
-            print(f"{'名称':20s} {'状态码':8s} {'响应长度':12s}")
-            print("-" * 45)
-            for v in vulnerable:
-                print(f"{v['name']:20s} {v['status_code']:<8d} {v['response_length']:<12d}")
-        else:
-            print("\n[-] 未发现明显的验证码绕过")
-            print("    注意: 这不能保证验证码实现是安全的。")
+    handlers = {
+        "download": _handle_download,
+        "ocr": _handle_ocr,
+        "manual": _handle_manual,
+        "auto": _handle_auto,
+        "bypass": _handle_bypass,
+    }
+    handler = handlers.get(args.command)
+    if handler:
+        handler(args)
 
 
 if __name__ == "__main__":
