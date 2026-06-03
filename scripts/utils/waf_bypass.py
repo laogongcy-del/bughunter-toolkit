@@ -154,50 +154,45 @@ class WAFBypassTester:
             print(f"\n[-] 获取基线响应失败: {e}")
             return False
 
-    def test_bypass(self, technique: dict) -> Optional[dict]:
-        """测试单个绕过方法"""
+    def _send_request(self, technique: dict) -> requests.Response:
+        """根据technique配置发送HTTP请求"""
         headers = dict(self.session.headers)
         headers.update(technique.get('headers', {}))
         method = technique.get('method', 'GET')
 
+        if technique.get('get_requests'):
+            http_methods = {
+                'GET': requests.get, 'POST': requests.post,
+                'PUT': requests.put, 'DELETE': requests.delete,
+                'PATCH': requests.patch, 'OPTIONS': requests.options,
+            }
+            requester = http_methods.get(method, requests.get)
+            return requester(self.url, headers=headers, timeout=self.timeout, verify=False)
+        return self.session.request(method, self.url, headers=headers, timeout=self.timeout)
+
+    def _check_bypassed(self, resp) -> bool:
+        """判断是否绕过WAF成功"""
+        status_changed = resp.status_code != self.baseline['status']
+        content_changed = len(resp.text) != self.baseline['length'] and len(resp.text) > 100
+
+        if status_changed and resp.status_code in (200, 201, 202, 204):
+            return True
+        if content_changed and not self._is_still_blocked(resp.text):
+            return True
+        return False
+
+    def test_bypass(self, technique: dict) -> Optional[dict]:
+        """测试单个绕过方法"""
         try:
             start = time.time()
-
-            if technique.get('get_requests'):
-                # 使用stamdard requests session
-                if method == 'GET':
-                    resp = requests.get(self.url, headers=headers, timeout=self.timeout, verify=False)
-                elif method == 'POST':
-                    resp = requests.post(self.url, headers=headers, timeout=self.timeout, verify=False)
-                elif method == 'PUT':
-                    resp = requests.put(self.url, headers=headers, timeout=self.timeout, verify=False)
-                elif method == 'DELETE':
-                    resp = requests.delete(self.url, headers=headers, timeout=self.timeout, verify=False)
-                elif method == 'PATCH':
-                    resp = requests.patch(self.url, headers=headers, timeout=self.timeout, verify=False)
-                elif method == 'OPTIONS':
-                    resp = requests.options(self.url, headers=headers, timeout=self.timeout, verify=False)
-                else:
-                    resp = requests.get(self.url, headers=headers, timeout=self.timeout, verify=False)
-            else:
-                resp = self.session.request(method, self.url, headers=headers, timeout=self.timeout)
-
+            resp = self._send_request(technique)
             elapsed = time.time() - start
             time.sleep(self.delay)
 
-            # 判断是否绕过成功
-            status_changed = resp.status_code != self.baseline['status']
-            content_changed = len(resp.text) != self.baseline['length'] and len(resp.text) > 100
-
-            bypassed = False
-            if status_changed and resp.status_code in (200, 201, 202, 204):
-                bypassed = True
-            elif content_changed and not self._is_still_blocked(resp.text):
-                bypassed = True
-
+            bypassed = self._check_bypassed(resp)
             result = {
                 'technique': technique['name'],
-                'method': method,
+                'method': technique.get('method', 'GET'),
                 'headers': technique.get('headers', {}),
                 'status': resp.status_code,
                 'length': len(resp.text),

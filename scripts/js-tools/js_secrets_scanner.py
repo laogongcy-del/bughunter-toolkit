@@ -38,7 +38,8 @@ BANNER = """
 SECRET_RULES = [
     # 云服务密钥
     (r'AKIA[0-9A-Z]{16}', 'AWS_Access_Key', 'HIGH'),
-    (r'("|\'\')?(?:aws_access_key_id|aws_secret_access_key)("|\'\')?\\s*[:=]\\s*("|\'\')([A-Za-z0-9/+=]{20,})("|\'\')', 'AWS_Credential', 'HIGH'),
+    (r'("|\'\')?(?:aws_access_key_id|aws_secret_access_key)'
+     r'("|\'\')?\\s*[:=]\\s*("|\'\')([A-Za-z0-9/+=]{20,})("|\'\')', 'AWS_Credential', 'HIGH'),
     (r'["\'](?:sk|pk)_[a-zA-Z0-9]{20,}["\']', 'Stripe_Key', 'HIGH'),
     (r'(?:sk|pk)_(?:live|test)_[a-zA-Z0-9]{10,}', 'Stripe_Key_v2', 'HIGH'),
 
@@ -70,7 +71,9 @@ SECRET_RULES = [
 
     # Google服务
     (r'AIza[0-9A-Za-z_-]{35}', 'Google_API_Key', 'HIGH'),
-    (r'["\'](?:google_client_id|google_oauth)["\'][\s:=]+["\'](\d+[-_][a-zA-Z0-9_-]+\.apps\.googleusercontent\.com)["\']', 'Google_OAuth_ID', 'MEDIUM'),
+    (r'["\'](?:google_client_id|google_oauth)["\']'
+     r'[\s:=]+["\'](\d+[-_][a-zA-Z0-9_-]+\.apps\.googleusercontent\.com)["\']',
+     'Google_OAuth_ID', 'MEDIUM'),
 
     # Firebase
     (r'["\'](?:firebase|firebase_url|databaseURL)["\'][\s:=]+["\']([^"\'\s]+)["\']', 'Firebase_URL', 'MEDIUM'),

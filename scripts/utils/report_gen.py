@@ -127,6 +127,36 @@ def generate_self_template(args) -> str:
 """
 
 
+def _fill_args_interactive(parser, args):
+    """交互式填写参数"""
+    print("[*] 进入交互模式（也可使用命令行参数）")
+    print()
+
+    if not args.target:
+        args.target = input("目标: ")
+    if not args.vuln_type:
+        args.vuln_type = input("漏洞类型: ")
+    if not args.severity:
+        args.severity = input("危害等级 (严重/高危/中危/低危): ") or '中危'
+    if not args.description:
+        args.description = input("漏洞描述: ")
+    if not args.impact:
+        args.impact = input("漏洞影响: ")
+    print("复现步骤 (每行一行，空行结束):")
+    steps = []
+    for i in range(3):
+        step = input(f"  步骤{i+1}: ")
+        if step:
+            steps.append(step)
+    if steps:
+        args.step1 = steps[0] if len(steps) > 0 else ''
+        args.step2 = steps[1] if len(steps) > 1 else ''
+        args.step3 = steps[2] if len(steps) > 2 else ''
+    if not args.fix:
+        args.fix = input("修复建议: ")
+    return args
+
+
 def main():
     print(BANNER)
 
@@ -151,31 +181,7 @@ def main():
 
     # 交互模式：如果没有提供参数，逐一询问
     if not any([args.target, args.vuln_type, args.description]):
-        print("[*] 进入交互模式（也可使用命令行参数）")
-        print()
-
-        if not args.target:
-            args.target = input("目标: ")
-        if not args.vuln_type:
-            args.vuln_type = input("漏洞类型: ")
-        if not args.severity:
-            args.severity = input("危害等级 (严重/高危/中危/低危): ") or '中危'
-        if not args.description:
-            args.description = input("漏洞描述: ")
-        if not args.impact:
-            args.impact = input("漏洞影响: ")
-        print("复现步骤 (每行一行，空行结束):")
-        steps = []
-        for i in range(3):
-            step = input(f"  步骤{i+1}: ")
-            if step:
-                steps.append(step)
-        if steps:
-            args.step1 = steps[0] if len(steps) > 0 else ''
-            args.step2 = steps[1] if len(steps) > 1 else ''
-            args.step3 = steps[2] if len(steps) > 2 else ''
-        if not args.fix:
-            args.fix = input("修复建议: ")
+        args = _fill_args_interactive(parser, args)
 
     # 生成报告
     if args.template == '补天':

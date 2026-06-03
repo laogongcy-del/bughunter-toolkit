@@ -86,7 +86,7 @@ class JSApiExtractor:
             if resp.status_code == 200 and resp.text:
                 return resp.text
             return None
-        except Exception as e:
+        except Exception:
             return None
 
     def extract_apis(self, content: str, source_url: str = '') -> dict:
