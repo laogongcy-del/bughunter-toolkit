@@ -251,9 +251,9 @@ def main():
             print(f"[!] 文件不存在: {args.file}")
             sys.exit(1)
 
-        urls = [l.strip() for l in path.read_text().splitlines()
-                if l.strip() and not l.startswith('#') and
-                (l.startswith('http://') or l.startswith('https://'))]
+        urls = [line.strip() for line in path.read_text().splitlines()
+                if line.strip() and not line.startswith('#') and
+                (line.startswith('http://') or line.startswith('https://'))]
 
         print(f"\n[*] 扫描 {len(urls)} 个JS文件...")
         for url in urls:
