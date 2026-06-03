@@ -199,12 +199,12 @@ def main():
     if tester.findings:
         print(f"\n[+] 检测完成，发现 {len(tester.findings)} 个可能的SSRF点")
         if args.output:
-            report = "\n".join([
-                f"URL: {f['payload']}",
-                f"状态: {f['status']}",
-                f"特征: {', '.join(f['indications'])}"
-                for f in tester.findings
-            ])
+            report_lines = []
+            for finding in tester.findings:
+                report_lines.append("URL: {}".format(finding['payload']))
+                report_lines.append("状态: {}".format(finding['status']))
+                report_lines.append("特征: {}".format(', '.join(finding['indications'])))
+            report = "\n".join(report_lines)
             Path(args.output).write_text(report, encoding='utf-8')
             print(f"[+] 报告已保存: {args.output}")
     else:

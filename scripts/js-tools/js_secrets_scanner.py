@@ -38,7 +38,7 @@ BANNER = """
 SECRET_RULES = [
     # 云服务密钥
     (r'AKIA[0-9A-Z]{16}', 'AWS_Access_Key', 'HIGH'),
-    (r'("|'')?(?:aws_access_key_id|aws_secret_access_key)("|'')?\s*[:=]\s*("|'')([A-Za-z0-9/+=]{20,})("|'')', 'AWS_Credential', 'HIGH'),
+    (r'("|\'\')?(?:aws_access_key_id|aws_secret_access_key)("|\'\')?\\s*[:=]\\s*("|\'\')([A-Za-z0-9/+=]{20,})("|\'\')', 'AWS_Credential', 'HIGH'),
     (r'["\'](?:sk|pk)_[a-zA-Z0-9]{20,}["\']', 'Stripe_Key', 'HIGH'),
     (r'(?:sk|pk)_(?:live|test)_[a-zA-Z0-9]{10,}', 'Stripe_Key_v2', 'HIGH'),
 
