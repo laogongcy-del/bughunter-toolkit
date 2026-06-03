@@ -26,7 +26,6 @@ APK分析工具 - Android APK Static Analyzer
 """
 
 import argparse
-import gzip
 import hashlib
 import json
 import os
@@ -34,13 +33,12 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 import zipfile
 from datetime import datetime
-from pathlib import Path
-from typing import Optional, List, Set, Tuple, Dict
+from typing import Optional, List, Tuple, Dict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import logging
 
 # ---------------------------------------------------------------------------
 # 授权确认
