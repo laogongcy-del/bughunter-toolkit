@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  toolkit:
+    build: .
+    container_name: bugbounty-toolkit
+    volumes:
+      - ./output:/toolkit/output
+      - ./wordlists:/toolkit/wordlists
+      - ./templates:/toolkit/templates
+      - ./scripts:/toolkit/scripts
+    environment:
+      - TZ=Asia/Shanghai
+    stdin_open: true
+    tty: true
+    restart: unless-stopped

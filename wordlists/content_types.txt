@@ -1,0 +1,95 @@
+application/x-www-form-urlencoded
+application/json
+application/xml
+text/xml
+text/html
+text/plain
+text/csv
+multipart/form-data
+multipart/mixed
+application/x-www-form-urlencoded; charset=utf-8
+application/json; charset=utf-8
+application/json; charset=utf-16
+application/xml; charset=utf-8
+text/xml; charset=utf-8
+text/plain; charset=utf-8
+application/octet-stream
+application/pdf
+application/javascript
+application/ecmascript
+application/graphql
+application/graphql-response+json
+application/ld+json
+application/merge-patch+json
+application/problem+json
+application/problem+xml
+application/vnd.api+json
+application/vnd.oai.openapi+json;version=3.0
+application/xhtml+xml
+application/x-yaml
+application/yaml
+text/yaml
+application/bson
+application/cbor
+application/x-msgpack
+application/x-protobuf
+application/grpc
+application/grpc-web
+text/event-stream
+text/x-json
+text/xml-external-parsed-entity
+application/soap+xml
+application/atom+xml
+application/rss+xml
+application/x-dart
+application/x-httpd-php
+application/x-httpd-php-source
+application/x-java-serialized-object
+application/x-java-jnlp-file
+application/x-perl
+application/x-python-code
+application/x-ruby
+application/x-tar
+application/x-gzip
+application/x-bzip2
+application/x-7z-compressed
+application/x-zip-compressed
+application/x-rar-compressed
+application/java-archive
+application/x-shockwave-flash
+application/vnd.ms-excel
+application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+application/vnd.ms-powerpoint
+application/vnd.openxmlformats-officedocument.presentationml.presentation
+application/msword
+application/vnd.openxmlformats-officedocument.wordprocessingml.document
+application/x-navigator-javascript
+application/x-www-form-urlencoded; charset=iso-8859-1
+application/x-www-form-urlencoded; charset=windows-1251
+multipart/form-data; boundary=----WebKitFormBoundary
+multipart/form-data; charset=utf-8
+multipart/byteranges
+application/json; odata=verbose
+application/json; odata.metadata=minimal
+application/json; IEEE754Compatible=true
+application/xml; q=0.9
+text/xml; q=0.8
+application/octet-stream; charset=utf-8
+application/csp-report
+application/expect-ct-report+json
+application/trust-announcement
+application/trust-manifest
+application/ocsp-request
+application/pkcs10
+application/pkix-cert
+application/pkix-crl
+application/x-pem-file
+application/x-pkcs12
+application/x-pkcs7-certificates
+application/x-pkcs7-certreqresp
+application/x-pkcs7-crl
+application/x-pkcs7-mime
+application/x-pkcs7-signature
+application/xml-dtd
+application/xslt+xml
+application/xproc+xml
